@@ -1,18 +1,25 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using TMPro;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public class GridManager : MonoBehaviour
 {
     public string path;
-    public GameObject CellPrefab;
+    public GameObject cellPrefab;
     
+    private TextMeshProUGUI _cellText;
+    private TextMeshProUGUI _frameText;
     private int _frame;
     
     // Start is called before the first frame update
     private void Start()
     {
+        _cellText = GameObject.Find("Cell Info").GetComponent<TextMeshProUGUI>();
+        _frameText = GameObject.Find("Frame Info").GetComponent<TextMeshProUGUI>();
+        
         DrawGrid();
     }
 
@@ -57,12 +64,12 @@ public class GridManager : MonoBehaviour
                 if (height == 0)
                     continue;
                 
-                GameObject cell = Instantiate(CellPrefab, transform, true);
+                GameObject cell = Instantiate(cellPrefab, transform, true);
                 cell.transform.position = new Vector3(x - grid.Width / 2f, 0, -(y - grid.Height / 2f));
-                cell.GetComponent<WaterCell>().SetHeight(grid.GetCell(x, y).H);
+                cell.GetComponent<WaterCell>().Init(grid.GetCell(x, y), _cellText);
             }
         }
-        
 
+        _frameText.text = $"Frame {_frame}";
     }
 }

@@ -53,6 +53,7 @@ public class Grid
             for (var x = 0; x < Width; x++)
             {
                 _cells[y, x] = new Cell(
+                    x, y,
                     float.Parse(heightsLines[y][x]),
                     float.Parse(velocitiesXLines[y][x]),
                     float.Parse(velocitiesYLines[y][x])
