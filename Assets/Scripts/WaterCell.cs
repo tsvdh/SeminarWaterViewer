@@ -27,7 +27,7 @@ public class WaterCell : MonoBehaviour
 
     private void OnMouseEnter()
     {
-        _text.text = $"({_cell.X}, {_cell.Y}): h: {_cell.H}, qx: {_cell.Qx}, qy: {_cell.Qy}";
+        _text.text = $"({_cell.X + 1}, {_cell.Y + 1}): h: {_cell.H}, qx: {_cell.Qx}, qy: {_cell.Qy}";
     }
 
     // Start is called before the first frame update

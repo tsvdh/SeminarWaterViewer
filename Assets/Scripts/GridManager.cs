@@ -26,28 +26,29 @@ public class GridManager : MonoBehaviour
     // Update is called once per frame
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.RightArrow))
+        if (Input.GetKeyDown(KeyCode.RightArrow) 
+            || (Input.GetKey(KeyCode.RightArrow) && Input.GetKey(KeyCode.RightShift)))
         {
             _frame++;
-            DrawGrid();
+            if (!DrawGrid())
+                _frame--;
         }
 
-        if (Input.GetKeyDown(KeyCode.LeftArrow))
+        if (Input.GetKeyDown(KeyCode.LeftArrow) 
+            || (Input.GetKey(KeyCode.LeftArrow) && Input.GetKey(KeyCode.RightShift)))
         {
             _frame--;
-            DrawGrid();
+            if (!DrawGrid())
+                _frame++;
         }
     }
 
-    private void DrawGrid()
+    private bool DrawGrid()
     {
         var fullPath = $"{path}\\out{_frame}.txt";
 
         if (!File.Exists(fullPath))
-        {
-            Debug.Log($"{fullPath} does not exist");
-            return;
-        }
+            return false;
 
         foreach (Transform child in transform)
         {
@@ -71,5 +72,7 @@ public class GridManager : MonoBehaviour
         }
 
         _frameText.text = $"Frame {_frame}";
+
+        return true;
     }
 }

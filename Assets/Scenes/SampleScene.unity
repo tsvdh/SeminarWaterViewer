@@ -157,7 +157,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4d5b642d30ff52f4fb5669ceff1b21a9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  path: C:\Users\tsvdh\IntellijProjects\SeminarWaterSim\grids\simple
+  path: C:\Users\tsvdh\IntellijProjects\SeminarWaterSim\grids\simple_correct
   cellPrefab: {fileID: 7577704808067623309, guid: e5d8009865b923c45862e7a3f3874130, type: 3}
 --- !u!4 &250286340
 Transform:

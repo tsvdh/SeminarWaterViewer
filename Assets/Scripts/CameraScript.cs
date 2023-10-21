@@ -14,21 +14,26 @@ public class CameraScript : MonoBehaviour
     private void FixedUpdate()
     {
         Transform curTransform = transform;
+
+        Vector3 forward = curTransform.forward;
+        forward.y = 0;
+        forward.Normalize();
+        
         if (Input.GetKey(KeyCode.W))
         {
-            curTransform.position += Vector3.forward * 0.2f;
+            curTransform.position += forward * 0.2f;
         }
         if (Input.GetKey(KeyCode.S))
         {
-            curTransform.position += Vector3.forward * -0.2f;
+            curTransform.position += forward * -0.2f;
         }
         if (Input.GetKey(KeyCode.A))
         {
-            curTransform.position += Vector3.right * -0.2f;
+            curTransform.position += curTransform.right * -0.2f;
         }
         if (Input.GetKey(KeyCode.D))
         {
-            curTransform.position += Vector3.right * 0.2f;
+            curTransform.position += curTransform.right * 0.2f;
         }
 
         float scroll = Input.mouseScrollDelta.y;
