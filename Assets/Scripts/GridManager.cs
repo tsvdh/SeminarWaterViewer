@@ -1,17 +1,23 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.Serialization;
+using UnityEngine.UI;
 
 public class GridManager : MonoBehaviour
 {
     public string path;
+    public string simName;
     public GameObject cellPrefab;
     
     private TextMeshProUGUI _cellText;
     private TextMeshProUGUI _frameText;
+    private Toggle _heightToggle;
+    
     private int _frame;
     
     // Start is called before the first frame update
@@ -19,6 +25,9 @@ public class GridManager : MonoBehaviour
     {
         _cellText = GameObject.Find("Cell Info").GetComponent<TextMeshProUGUI>();
         _frameText = GameObject.Find("Frame Info").GetComponent<TextMeshProUGUI>();
+        _heightToggle = GameObject.Find("Height Toggle").GetComponent<Toggle>();
+        
+        _heightToggle.onValueChanged.AddListener(_ => DrawGrid());
         
         DrawGrid();
     }
@@ -45,7 +54,7 @@ public class GridManager : MonoBehaviour
 
     private bool DrawGrid()
     {
-        var fullPath = $"{path}\\out{_frame}.txt";
+        var fullPath = $@"{path}\output\{simName}\{_frame}.txt";
 
         if (!File.Exists(fullPath))
             return false;
@@ -62,7 +71,7 @@ public class GridManager : MonoBehaviour
             for (var x = 0; x < grid.Width; x++)
             {
                 float height = grid.GetCell(x, y).H;
-                if (height == 0)
+                if (_heightToggle.isOn ? height == 0 : height < 1 / Math.Pow(10, 4))
                     continue;
                 
                 GameObject cell = Instantiate(cellPrefab, transform, true);
