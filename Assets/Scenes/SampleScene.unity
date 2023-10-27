@@ -159,7 +159,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   path: C:\Users\tsvdh\IntellijProjects\SeminarWaterSim\grids
   simName: simple_2d
-  cellPrefab: {fileID: 7577704808067623309, guid: e5d8009865b923c45862e7a3f3874130, type: 3}
+  waterCellPrefab: {fileID: 7577704808067623309, guid: e5d8009865b923c45862e7a3f3874130, type: 3}
+  wallCellPrefab: {fileID: 7577704808067623309, guid: 50bcaf5a91832554e8a6ca8dec625688, type: 3}
+  groundCellPrefab: {fileID: 7159308600424590165, guid: 58c92d07be0fe1a4a9307095db6feade, type: 3}
 --- !u!4 &250286340
 Transform:
   m_ObjectHideFlags: 0
@@ -173,7 +175,9 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 532703013}
   - {fileID: 187284213}
+  - {fileID: 703170851}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &275109779
@@ -477,12 +481,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 532703009}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 20, y: 1, z: 20}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 250286340}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &636054742
 GameObject:
@@ -559,6 +563,68 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 636054742}
   m_CullTransparentMesh: 1
+--- !u!1001 &703170850
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 250286340}
+    m_Modifications:
+    - target: {fileID: 6163414900052227917, guid: 50bcaf5a91832554e8a6ca8dec625688, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6163414900052227917, guid: 50bcaf5a91832554e8a6ca8dec625688, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 6163414900052227917, guid: 50bcaf5a91832554e8a6ca8dec625688, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 6163414900052227917, guid: 50bcaf5a91832554e8a6ca8dec625688, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6163414900052227917, guid: 50bcaf5a91832554e8a6ca8dec625688, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6163414900052227917, guid: 50bcaf5a91832554e8a6ca8dec625688, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6163414900052227917, guid: 50bcaf5a91832554e8a6ca8dec625688, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6163414900052227917, guid: 50bcaf5a91832554e8a6ca8dec625688, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6163414900052227917, guid: 50bcaf5a91832554e8a6ca8dec625688, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6163414900052227917, guid: 50bcaf5a91832554e8a6ca8dec625688, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7577704808067623309, guid: 50bcaf5a91832554e8a6ca8dec625688, type: 3}
+      propertyPath: m_Name
+      value: WallCellPrefab
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 50bcaf5a91832554e8a6ca8dec625688, type: 3}
+--- !u!4 &703170851 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6163414900052227917, guid: 50bcaf5a91832554e8a6ca8dec625688, type: 3}
+  m_PrefabInstance: {fileID: 703170850}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0
@@ -989,7 +1055,7 @@ MonoBehaviour:
           m_StringArgument: BoolEvent
           m_BoolArgument: 0
         m_CallState: 2
-  m_IsOn: 0
+  m_IsOn: 1
 --- !u!1 &1041626989
 GameObject:
   m_ObjectHideFlags: 0
@@ -1040,7 +1106,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
+  m_Color: {r: 0, g: 0, b: 0, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -1312,7 +1378,6 @@ SceneRoots:
   m_Roots:
   - {fileID: 963194228}
   - {fileID: 705507995}
-  - {fileID: 532703013}
   - {fileID: 250286340}
   - {fileID: 324199231}
   - {fileID: 1094332843}

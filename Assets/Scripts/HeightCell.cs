@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
-public class WaterCell : MonoBehaviour
+public class HeightCell : MonoBehaviour
 {
     private Cell _cell;
     private TextMeshProUGUI _text;
@@ -28,17 +28,5 @@ public class WaterCell : MonoBehaviour
     private void OnMouseEnter()
     {
         _text.text = $"({_cell.X + 1}, {_cell.Y + 1}): h: {_cell.H}, qx: {_cell.Qx}, qy: {_cell.Qy}";
-    }
-
-    // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
     }
 }

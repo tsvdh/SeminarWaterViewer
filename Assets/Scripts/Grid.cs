@@ -8,11 +8,10 @@ public class Grid
     public readonly int Width;
     public readonly int Height;
     private Cell[,] _cells;
-    
-    public Grid(string path)
+
+    public Grid(string text)
     {
-        string text = File.ReadAllText(path);
-        string[] lines = text.Split("\n");
+        string[] lines = text.Trim().Split("\n");
 
         var heightsLines = new List<string[]>();
         var velocitiesXLines = new List<string[]>();
@@ -48,16 +47,33 @@ public class Grid
         
         _cells = new Cell[Height, Width];
 
-        for (var y = 0; y < Height; y++)
+        if (velocitiesXLines.Count > 0) // check here so only one check
         {
-            for (var x = 0; x < Width; x++)
+            for (var y = 0; y < Height; y++)
             {
-                _cells[y, x] = new Cell(
-                    x, y,
-                    float.Parse(heightsLines[y][x]),
-                    float.Parse(velocitiesXLines[y][x]),
-                    float.Parse(velocitiesYLines[y][x])
-                );
+                for (var x = 0; x < Width; x++)
+                {
+                    _cells[y, x] = new Cell(
+                        x, y,
+                        float.Parse(heightsLines[y][x]),
+                        float.Parse(velocitiesXLines[y][x]),
+                        float.Parse(velocitiesYLines[y][x])
+                    );
+                }
+            }
+        }
+        else
+        {
+            for (var y = 0; y < Height; y++)
+            {
+                for (var x = 0; x < Width; x++)
+                {
+                    _cells[y, x] = new Cell(
+                        x, y,
+                        float.Parse(heightsLines[y][x]),
+                        0, 0
+                    );
+                }
             }
         }
     }
