@@ -7,7 +7,7 @@ public class Grid
 {
     public readonly int Width;
     public readonly int Height;
-    private Cell[,] _cells;
+    public Cell[,] _cells;
 
     public Grid(string text)
     {
