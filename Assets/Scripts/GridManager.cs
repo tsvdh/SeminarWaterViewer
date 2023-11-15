@@ -60,16 +60,19 @@ public class GridManager : MonoBehaviour
         _cornerVertices = (_width + 1) * (_height + 1);
         _centerVertices = _width * _height;
         _triangles = 12 * _centerVertices;
+
+        GameObject ground = Instantiate(groundCellPrefab, transform, true);
+        Vector3 groundPos = ground.transform.position;
+        groundPos.y = -0.5f;
+        groundPos.x -= 0.5f;
+        groundPos.z += 0.5f;
+        ground.transform.position = groundPos;
+        ground.GetComponent<GroundCell>().Init(_width, _height);
         
         for (var y = 0; y < _height; y++)
         {
             for (var x = 0; x < _width; x++)
             {
-                GameObject ground = Instantiate(groundCellPrefab, transform, true);
-                Vector3 pos = GridToWorldCoors(x, y);
-                pos.y = -0.5f;
-                ground.transform.position = pos;
-
                 if (_heightGrid.GetCell(x, y).H > 0)
                 {
                     GameObject wall = Instantiate(wallCellPrefab, transform, true);
