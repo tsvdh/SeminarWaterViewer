@@ -1,11 +1,8 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.IO;
 using TMPro;
 using UnityEngine;
-using UnityEngine.Events;
-using UnityEngine.Serialization;
+using UnityEngine.Rendering;
 using UnityEngine.UI;
 
 public class GridManager : MonoBehaviour
@@ -22,6 +19,7 @@ public class GridManager : MonoBehaviour
     private Toggle _heightToggle;
     private Toggle _meshToggle;
 
+    private int _frame;
     private int _simFPS;
     private float _timeSinceLastFrame;
     private bool _forwardCache;
@@ -29,12 +27,11 @@ public class GridManager : MonoBehaviour
     
     private int _width;
     private int _height;
-    
     private int _cornerVertices;
     private int _centerVertices;
     private int _triangles;
-    
-    private int _frame;
+
+    private Grid _heightGrid;
     
     // Start is called before the first frame update
     private void Start()
@@ -56,9 +53,9 @@ public class GridManager : MonoBehaviour
         _simFPS = int.Parse(args[0]);
         
         string data = File.ReadAllText(inputPath).Split("-")[1];
-        var heightGrid = new Grid(data);
-        _width = heightGrid.Width;
-        _height = heightGrid.Height;
+        _heightGrid = new Grid(data);
+        _width = _heightGrid.Width;
+        _height = _heightGrid.Height;
         
         _cornerVertices = (_width + 1) * (_height + 1);
         _centerVertices = _width * _height;
@@ -73,11 +70,11 @@ public class GridManager : MonoBehaviour
                 pos.y = -0.5f;
                 ground.transform.position = pos;
 
-                if (heightGrid.GetCell(x, y).H > 0)
+                if (_heightGrid.GetCell(x, y).H > 0)
                 {
                     GameObject wall = Instantiate(wallCellPrefab, transform, true);
                     wall.transform.position = GridToWorldCoors(x, y);
-                    wall.GetComponent<HeightCell>().Init(heightGrid.GetCell(x, y), _cellText);
+                    wall.GetComponent<HeightCell>().Init(_heightGrid.GetCell(x, y), _cellText);
                 }
             }
         }
@@ -130,6 +127,8 @@ public class GridManager : MonoBehaviour
 
     private bool DrawGrid()
     {
+        // long start = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+        
         var outputPath = $@"{path}\output\{simName}\{_frame}.txt";
 
         if (!File.Exists(outputPath))
@@ -139,9 +138,13 @@ public class GridManager : MonoBehaviour
 
         var grid = new Grid(File.ReadAllText(outputPath));
 
+        // long now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+        // Debug.Log($"Disk access: {now - start}ms");
+        // start = now;
+        
         if (_meshToggle.isOn)
         {
-            var mesh = new Mesh();
+            var mesh = new Mesh { indexFormat = IndexFormat.UInt32 };
             var vertices = new Vector3[_triangles];
             var triangles = new int[_triangles];
 
@@ -164,6 +167,9 @@ public class GridManager : MonoBehaviour
             {
                 for (var x = 0; x < _width; x++)
                 {
+                    if (_heightGrid.GetCell(x, y).H > 0)
+                        continue;
+                    
                     int startIndex = CoorsToTriangleIndex(x, y);
 
                     Vector3 topLeftPos = interpGrid[CoorsToVertexIndex(x, y, false)];
@@ -217,6 +223,9 @@ public class GridManager : MonoBehaviour
 
         _frameText.text = $"Frame {_frame}";
 
+        // now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+        // Debug.Log($"Mesh construction: {now - start}ms");
+        
         return true;
     }
 
@@ -254,13 +263,24 @@ public class GridManager : MonoBehaviour
         float bottomLeft = grid.GetCell(xMin, yMax).H;
         float bottomRight = grid.GetCell(xMax, yMax).H;
 
+        bool topLeftWall = _heightGrid.GetCell(xMin, yMin).H > 0;
+        bool topRightWall = _heightGrid.GetCell(xMax, yMin).H > 0;
+        bool bottomLeftWall = _heightGrid.GetCell(xMin, yMax).H > 0;
+        bool bottomRightWall = _heightGrid.GetCell(xMax, yMax).H > 0;
+
         float xW = xGrid - (float)Math.Truncate(xGrid);
         float yW = yGrid - (float)Math.Truncate(yGrid);
-        
-        float top = Lerp(topLeft, topRight, xW);
-        float bottom = Lerp(bottomLeft, bottomRight, xW);
 
-        return Lerp(top, bottom, yW);
+        float top = topLeftWall ? topRight 
+                    : topRightWall ? topLeft 
+                    : Lerp(topLeft, topRight, xW);
+        float bottom = bottomLeftWall ? bottomRight 
+                       : bottomRightWall ? bottomLeft
+                       : Lerp(bottomLeft, bottomRight, xW);
+
+        return topLeftWall && topRightWall ? bottom 
+                   : bottomLeftWall && bottomRightWall ? top 
+                   : Lerp(top, bottom, yW);
     }
 
     private static float Lerp(float a, float b, float w)

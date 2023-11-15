@@ -158,7 +158,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   path: C:\Users\tsvdh\IntellijProjects\SeminarWaterSim\grids
-  simName: simple_2d
+  simName: small_2d
   waterCellPrefab: {fileID: 7577704808067623309, guid: e5d8009865b923c45862e7a3f3874130, type: 3}
   wallCellPrefab: {fileID: 7577704808067623309, guid: 50bcaf5a91832554e8a6ca8dec625688, type: 3}
   groundCellPrefab: {fileID: 7159308600424590165, guid: 58c92d07be0fe1a4a9307095db6feade, type: 3}
@@ -301,7 +301,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: 20, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -840,7 +840,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: 20, y: 0, z: 0, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
