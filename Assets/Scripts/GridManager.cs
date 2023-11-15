@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using TMPro;
 using UnityEngine;
@@ -32,6 +33,9 @@ public class GridManager : MonoBehaviour
     private int _triangles;
 
     private Grid _heightGrid;
+
+    private List<Grid> _grids;
+    private List<Mesh> _meshes;
     
     // Start is called before the first frame update
     private void Start()
@@ -82,6 +86,20 @@ public class GridManager : MonoBehaviour
             }
         }
 
+        _grids = new List<Grid>();
+        _meshes = new List<Mesh>();
+        
+        var i = 0;
+        while (true)
+        {
+            (Grid grid, Mesh mesh) = LoadFrame(i++);
+            if (grid == null)
+                break;
+            
+            _grids.Add(grid);
+            _meshes.Add(mesh);
+        }
+
         DrawGrid();
     }
 
@@ -128,80 +146,84 @@ public class GridManager : MonoBehaviour
         }
     }
 
-    private bool DrawGrid()
+    private (Grid, Mesh) LoadFrame(int frame)
     {
-        // long start = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-        
-        var outputPath = $@"{path}\output\{simName}\{_frame}.txt";
+        var outputPath = $@"{path}\output\{simName}\{frame}.txt";
 
         if (!File.Exists(outputPath))
-            return false;
-
-        ClearChildren(true);
-
+            return (null, null);
+        
         var grid = new Grid(File.ReadAllText(outputPath));
+        
+        var mesh = new Mesh { indexFormat = IndexFormat.UInt32 };
+        var vertices = new Vector3[_triangles];
+        var triangles = new int[_triangles];
 
-        // long now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-        // Debug.Log($"Disk access: {now - start}ms");
-        // start = now;
+        var interpGrid = new Vector3[_cornerVertices];
+
+        for (var y = 0; y <= grid.Height; y++)
+        {
+            for (var x = 0; x <= grid.Width; x++)
+            {
+                Vector3 cornerPos = GridToWorldCoors(x, y);
+                cornerPos.y = ShiftNearZeroHeight(BiLerp(x, y, grid));
+                cornerPos.x -= 0.5f;
+                cornerPos.z += 0.5f;
+
+                interpGrid[CoorsToVertexIndex(x, y, false)] = cornerPos;
+            }
+        }
+        
+        for (var y = 0; y < _height; y++)
+        {
+            for (var x = 0; x < _width; x++)
+            {
+                if (_heightGrid.GetCell(x, y).H > 0)
+                    continue;
+                
+                int startIndex = CoorsToTriangleIndex(x, y);
+
+                Vector3 topLeftPos = interpGrid[CoorsToVertexIndex(x, y, false)];
+                Vector3 topRightPos = interpGrid[CoorsToVertexIndex(x + 1, y, false)];
+                Vector3 bottomLeftPos = interpGrid[CoorsToVertexIndex(x, y + 1, false)];
+                Vector3 bottomRightPos = interpGrid[CoorsToVertexIndex(x + 1, y + 1, false)];
+                Vector3 centerPos = GridToWorldCoors(x, y);
+                centerPos.y = ShiftNearZeroHeight(grid.GetCell(x, y).H);
+
+                Vector3[] posArray =
+                {
+                    centerPos, topLeftPos, topRightPos, // top
+                    centerPos, bottomLeftPos, topLeftPos, // left
+                    centerPos, bottomRightPos, bottomLeftPos, // bottom
+                    centerPos, topRightPos, bottomRightPos // right
+                };
+                
+                for (var i = 0; i < 12; i++)
+                {
+                    vertices[startIndex + i] = posArray[i];
+                    triangles[startIndex + i] = startIndex + i;
+                }
+            }
+        }
+
+        mesh.vertices = vertices;
+        mesh.triangles = triangles;
+        mesh.RecalculateNormals();
+
+        return (grid, mesh);
+    }
+
+    private bool DrawGrid()
+    {
+        if (_frame < 0 || _frame >= _grids.Count)
+            return false;
+        
+        ClearChildren(true);
         
         if (_meshToggle.isOn)
         {
-            var mesh = new Mesh { indexFormat = IndexFormat.UInt32 };
-            var vertices = new Vector3[_triangles];
-            var triangles = new int[_triangles];
-
-            var interpGrid = new Vector3[_cornerVertices];
-
-            for (var y = 0; y <= grid.Height; y++)
-            {
-                for (var x = 0; x <= grid.Width; x++)
-                {
-                    Vector3 cornerPos = GridToWorldCoors(x, y);
-                    cornerPos.y = ShiftNearZeroHeight(BiLerp(x, y, grid));
-                    cornerPos.x -= 0.5f;
-                    cornerPos.z += 0.5f;
-
-                    interpGrid[CoorsToVertexIndex(x, y, false)] = cornerPos;
-                }
-            }
+            Mesh mesh = _meshes[_frame];
             
-            for (var y = 0; y < _height; y++)
-            {
-                for (var x = 0; x < _width; x++)
-                {
-                    if (_heightGrid.GetCell(x, y).H > 0)
-                        continue;
-                    
-                    int startIndex = CoorsToTriangleIndex(x, y);
-
-                    Vector3 topLeftPos = interpGrid[CoorsToVertexIndex(x, y, false)];
-                    Vector3 topRightPos = interpGrid[CoorsToVertexIndex(x + 1, y, false)];
-                    Vector3 bottomLeftPos = interpGrid[CoorsToVertexIndex(x, y + 1, false)];
-                    Vector3 bottomRightPos = interpGrid[CoorsToVertexIndex(x + 1, y + 1, false)];
-                    Vector3 centerPos = GridToWorldCoors(x, y);
-                    centerPos.y = ShiftNearZeroHeight(grid.GetCell(x, y).H);
-
-                    Vector3[] posArray =
-                    {
-                        centerPos, topLeftPos, topRightPos, // top
-                        centerPos, bottomLeftPos, topLeftPos, // left
-                        centerPos, bottomRightPos, bottomLeftPos, // bottom
-                        centerPos, topRightPos, bottomRightPos // right
-                    };
-                    
-                    for (var i = 0; i < 12; i++)
-                    {
-                        vertices[startIndex + i] = posArray[i];
-                        triangles[startIndex + i] = startIndex + i;
-                    }
-                }
-            }
-
-            mesh.vertices = vertices;
-            mesh.triangles = triangles;
-            mesh.RecalculateNormals();
-
             var surface = new GameObject("Surface", typeof(MeshFilter), typeof(MeshRenderer));
             surface.transform.parent = transform;
             surface.GetComponent<MeshFilter>().mesh = mesh;
@@ -209,6 +231,8 @@ public class GridManager : MonoBehaviour
         }
         else
         {
+            Grid grid = _grids[_frame];
+            
             for (var y = 0; y < grid.Height; y++)
             {
                 for (var x = 0; x < grid.Width; x++)
@@ -225,9 +249,6 @@ public class GridManager : MonoBehaviour
         }
 
         _frameText.text = $"Frame {_frame}";
-
-        // now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-        // Debug.Log($"Mesh construction: {now - start}ms");
         
         return true;
     }
