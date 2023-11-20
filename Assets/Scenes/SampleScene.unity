@@ -158,7 +158,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   path: C:\Users\tsvdh\IntellijProjects\SeminarWaterSim\grids
-  simName: small_2d
+  simName: large_2d
   waterCellPrefab: {fileID: 7577704808067623309, guid: e5d8009865b923c45862e7a3f3874130, type: 3}
   wallCellPrefab: {fileID: 7577704808067623309, guid: 50bcaf5a91832554e8a6ca8dec625688, type: 3}
   groundCellPrefab: {fileID: 7159308600424590165, guid: 58c92d07be0fe1a4a9307095db6feade, type: 3}

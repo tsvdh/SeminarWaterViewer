@@ -22,6 +22,7 @@ public class GridManager : MonoBehaviour
 
     private int _frame;
     private int _simFPS;
+    private int _numFrames;
     private float _timeSinceLastFrame;
     private bool _forwardCache;
     private bool _backwardsCache;
@@ -55,6 +56,7 @@ public class GridManager : MonoBehaviour
 
         string[] args = File.ReadAllText(configPath).Trim().Split("\n");
         _simFPS = int.Parse(args[0]);
+        _numFrames = int.Parse(args[1]) * _simFPS;
         
         string data = File.ReadAllText(inputPath).Split("-")[1];
         _heightGrid = new Grid(data);
@@ -88,17 +90,16 @@ public class GridManager : MonoBehaviour
 
         _grids = new List<Grid>();
         _meshes = new List<Mesh>();
-        
-        var i = 0;
-        while (true)
+
+        long loadStart = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+        for (var i = 0; i <= _numFrames; i++)
         {
-            (Grid grid, Mesh mesh) = LoadFrame(i++);
-            if (grid == null)
-                break;
-            
+            (Grid grid, Mesh mesh) = LoadFrame(i);
             _grids.Add(grid);
             _meshes.Add(mesh);
         }
+        long loadingTime = DateTimeOffset.Now.ToUnixTimeMilliseconds() - loadStart;
+        Debug.Log($"Loading took: {loadingTime / 1000}s ({loadingTime / _numFrames}ms per frame)");
 
         DrawGrid();
     }
