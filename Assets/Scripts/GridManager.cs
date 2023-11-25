@@ -1,20 +1,18 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using TimeUtils;
 using TMPro;
-using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.UI;
 using Logger = TimeUtils.Logger;
+using Object = UnityEngine.Object;
 
 public class GridManager : MonoBehaviour
 {
-    private class ConfigFile
+    private struct ConfigFile
     {
         public int fps;
         public int seconds;
@@ -208,18 +206,19 @@ public class GridManager : MonoBehaviour
             for (var i = 0; i < _numFrames; i++)
             {
                 if (_grids[i] != null)
-                {
                     framesLoaded++;
-                }
             }
 
             if (framesLoaded == _numFrames)
                 Logger.EndEvent(LoadingEvent.GridProcessing, Format.Seconds);
             else
                 return;
-            
+        }
+
+        if (!Logger.IsEventStarted(LoadingEvent.MeshProcessing))
+        {
             Logger.StartEvent(LoadingEvent.MeshProcessing);
-            
+
             for (var i = 0; i < _numFrames; i++)
             {
                 _meshes[i] = new Mesh
@@ -228,10 +227,31 @@ public class GridManager : MonoBehaviour
                     vertices = _meshComponents[i].Item1,
                     triangles = _meshComponents[i].Item2
                 };
-                _meshes[i].RecalculateNormals();
+            }
+            
+            Task.Run(() => Parallel.For(0, _numFrames, 
+                                        new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount - 1 }, 
+                                        (i) => _meshes[i].RecalculateNormals()));
+            return;
+        }
+
+        if (Logger.IsEventRunning(LoadingEvent.MeshProcessing))
+        {
+            var meshesProcessed = 0;
+            for (var i = 0; i < _numFrames; i++)
+            {
+                if (!ReferenceEquals(_meshes[i], null))
+                    meshesProcessed++;
             }
 
-            Logger.EndEvent(LoadingEvent.MeshProcessing, Format.Seconds);
+            if (meshesProcessed == _numFrames)
+                Logger.EndEvent(LoadingEvent.MeshProcessing, Format.Seconds);
+            else
+                return;
+        }
+
+        if (!Logger.IsEventDone(LoadingEvent.All))
+        {
             Logger.EndEvent(LoadingEvent.All, Format.Seconds);
             DrawGrid();
         }
@@ -361,7 +381,7 @@ public class GridManager : MonoBehaviour
             return;
         
         Grid grid = _useSeparateFiles 
-                        ? new Grid(File.ReadAllText(outputPath)) 
+                        ? new Grid(File.ReadLines(outputPath)) 
                         : new Grid(_inputGrids[index]);
         
         var vertices = new Vector3[_triangles];

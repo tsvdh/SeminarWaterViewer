@@ -1,7 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
+﻿using System.Collections.Generic;
+using System.Linq;
 
 public class Grid
 {
@@ -9,10 +7,10 @@ public class Grid
     public readonly int Height;
     private readonly Cell[,] _cells;
 
-    public Grid(string text)
+    public Grid(string text) : this(text.Trim().Split("\n").AsEnumerable()) {}
+    
+    public Grid(IEnumerable<string> lines)
     {
-        string[] lines = text.Trim().Split("\n");
-
         var heightsLines = new List<string[]>();
         var velocitiesXLines = new List<string[]>();
         var velocitiesYLines = new List<string[]>();
