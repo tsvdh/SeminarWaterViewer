@@ -1,13 +1,34 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using TimeUtils;
 using TMPro;
+using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.UI;
+using Logger = TimeUtils.Logger;
 
 public class GridManager : MonoBehaviour
 {
+    private class ConfigFile
+    {
+        public int fps;
+        public int seconds;
+        public bool separateFiles;
+    }
+    
+    private enum LoadingEvent 
+    {
+        All,
+        DiskReading,
+        GridProcessing,
+        MeshProcessing
+    }
+    
     public string path;
     public string simName;
     public GameObject waterCellPrefab;
@@ -27,20 +48,30 @@ public class GridManager : MonoBehaviour
     private bool _forwardCache;
     private bool _backwardsCache;
     
-    private int _width;
-    private int _height;
-    private int _cornerVertices;
-    private int _centerVertices;
-    private int _triangles;
+    // Grid method variables
+    private static int _width;
+    private static int _height;
+    private static int _cornerVertices;
+    private static int _centerVertices;
+    private static int _triangles;
 
-    private Grid _heightGrid;
+    // Multithreading input variables
+    private static string _pathCopy;
+    private static string _simNameCopy;
+    private static Grid _heightGrid;
+    private static bool _useSeparateFiles;
 
-    private List<Grid> _grids;
-    private List<Mesh> _meshes;
+    // Multithreading output variables
+    private static string[] _inputGrids;
+    private static Grid[] _grids;
+    private static (Vector3[], int[])[] _meshComponents;
+    private static Mesh[] _meshes;
     
     // Start is called before the first frame update
     private void Start()
     {
+        _pathCopy = path;
+        _simNameCopy = simName;
         _cellText = GameObject.Find("Cell Info").GetComponent<TextMeshProUGUI>();
         _frameText = GameObject.Find("Frame Info").GetComponent<TextMeshProUGUI>();
         _heightToggle = GameObject.Find("Height Toggle").GetComponent<Toggle>();
@@ -51,12 +82,14 @@ public class GridManager : MonoBehaviour
 
         ClearChildren(false);
 
-        var configPath = $@"{path}\input\{simName}\config.txt";
+        var configPath = $@"{path}\input\{simName}\config.json";
         var inputPath = $@"{path}\input\{simName}\data.txt";
 
-        string[] args = File.ReadAllText(configPath).Trim().Split("\n");
-        _simFPS = int.Parse(args[0]);
-        _numFrames = int.Parse(args[1]) * _simFPS;
+        var config = JsonUtility.FromJson<ConfigFile>(File.ReadAllText(configPath));
+
+        _simFPS = config.fps;
+        _numFrames = config.seconds * _simFPS + 1;
+        _useSeparateFiles = config.separateFiles;
         
         string data = File.ReadAllText(inputPath).Split("-")[1];
         _heightGrid = new Grid(data);
@@ -88,20 +121,12 @@ public class GridManager : MonoBehaviour
             }
         }
 
-        _grids = new List<Grid>();
-        _meshes = new List<Mesh>();
-
-        long loadStart = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-        for (var i = 0; i <= _numFrames; i++)
-        {
-            (Grid grid, Mesh mesh) = LoadFrame(i);
-            _grids.Add(grid);
-            _meshes.Add(mesh);
-        }
-        long loadingTime = DateTimeOffset.Now.ToUnixTimeMilliseconds() - loadStart;
-        Debug.Log($"Loading took: {loadingTime / 1000}s ({loadingTime / _numFrames}ms per frame)");
-
-        DrawGrid();
+        _inputGrids = new string[_numFrames];
+        _grids = new Grid[_numFrames];
+        _meshComponents = new (Vector3[], int[])[_numFrames];
+        _meshes = new Mesh[_numFrames];
+        
+        Logger.StartEvent(LoadingEvent.All);
     }
 
     // Update is called once per frame
@@ -119,6 +144,8 @@ public class GridManager : MonoBehaviour
         
         if (_timeSinceLastFrame < 1f / _simFPS)
             return;
+
+        UpdateLoadingProcess();
         
         if (_forwardCache)
         {
@@ -138,6 +165,78 @@ public class GridManager : MonoBehaviour
         _backwardsCache = false;
     }
 
+    private void UpdateLoadingProcess()
+    {
+        if (!_useSeparateFiles && !Logger.IsEventStarted(LoadingEvent.DiskReading))
+        {
+            Logger.StartEvent(LoadingEvent.DiskReading);
+            Task.Run(() =>
+            {
+                var builder = new StringBuilder();
+                var index = 0;
+                
+                foreach (string line in File.ReadLines($@"{_pathCopy}\output\{_simNameCopy}\full.txt"))
+                {
+                    if (line.StartsWith("--"))
+                    {
+                        _inputGrids[index] = builder.ToString();
+                        builder.Clear();
+                        index++;
+                    }
+                    else
+                    {
+                        builder.AppendLine(line);
+                    }
+                }
+                Logger.EndEvent(LoadingEvent.DiskReading, Format.Seconds);
+            });
+            return;
+        }
+        
+        if (!Logger.IsEventRunning(LoadingEvent.DiskReading) && !Logger.IsEventStarted(LoadingEvent.GridProcessing))
+        {
+            Logger.StartEvent(LoadingEvent.GridProcessing);
+            Task.Run(() => Parallel.For(0, _numFrames, 
+                                        new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount - 1 }, 
+                                        LoadFrame));
+            return;
+        }
+        
+        if (Logger.IsEventRunning(LoadingEvent.GridProcessing))
+        {
+            var framesLoaded = 0;
+            for (var i = 0; i < _numFrames; i++)
+            {
+                if (_grids[i] != null)
+                {
+                    framesLoaded++;
+                }
+            }
+
+            if (framesLoaded == _numFrames)
+                Logger.EndEvent(LoadingEvent.GridProcessing, Format.Seconds);
+            else
+                return;
+            
+            Logger.StartEvent(LoadingEvent.MeshProcessing);
+            
+            for (var i = 0; i < _numFrames; i++)
+            {
+                _meshes[i] = new Mesh
+                {
+                    indexFormat = IndexFormat.UInt32,
+                    vertices = _meshComponents[i].Item1,
+                    triangles = _meshComponents[i].Item2
+                };
+                _meshes[i].RecalculateNormals();
+            }
+
+            Logger.EndEvent(LoadingEvent.MeshProcessing, Format.Seconds);
+            Logger.EndEvent(LoadingEvent.All, Format.Seconds);
+            DrawGrid();
+        }
+    }
+
     private void ClearChildren(bool keepSolid)
     {
         foreach (Transform child in transform)
@@ -147,16 +246,124 @@ public class GridManager : MonoBehaviour
         }
     }
 
-    private (Grid, Mesh) LoadFrame(int frame)
+    private bool DrawGrid()
     {
-        var outputPath = $@"{path}\output\{simName}\{frame}.txt";
+        if (_frame < 0 || _frame >= _grids.Length)
+            return false;
+        
+        ClearChildren(true);
+        
+        if (_meshToggle.isOn)
+        {
+            Mesh mesh = _meshes[_frame];
+            
+            var surface = new GameObject("Surface", typeof(MeshFilter), typeof(MeshRenderer));
+            surface.transform.parent = transform;
+            surface.GetComponent<MeshFilter>().mesh = mesh;
+            surface.GetComponent<MeshRenderer>().material = waterMaterial;
+        }
+        else
+        {
+            Grid grid = _grids[_frame];
+            
+            for (var y = 0; y < grid.Height; y++)
+            {
+                for (var x = 0; x < grid.Width; x++)
+                {
+                    float height = grid.GetCell(x, y).H;
+                    if (_heightToggle.isOn ? height == 0 : height < 1 / Math.Pow(10, 4))
+                        continue;
+
+                    GameObject cell = Instantiate(waterCellPrefab, transform, true);
+                    cell.transform.position = GridToWorldCoors(x, y);
+                    cell.GetComponent<HeightCell>().Init(grid.GetCell(x, y), _cellText);
+                }
+            }
+        }
+
+        _frameText.text = $"Frame {_frame}";
+        
+        return true;
+    }
+
+    private static Vector3 GridToWorldCoors(int x, int y)
+    {
+        return new Vector3(x - _width / 2f, 0, -(y - _height / 2f));
+    }
+
+    private static int CoorsToVertexIndex(int x, int y, bool cellCenter)
+    {
+        return !cellCenter 
+                   ? y * (_width + 1) + x 
+                   : _cornerVertices + y * _width + x;
+    }
+
+    private static int CoorsToTriangleIndex(int x, int y)
+    {
+        return 12 * (y * _width + x);
+    }
+
+    private static float BiLerp(float x, float y, Grid grid)
+    {
+        // shift cell coors to grid center coors
+        float xGrid = x - 0.5f;
+        float yGrid = y - 0.5f;
+
+        int xMin = Math.Max(0, (int)Math.Floor(xGrid));
+        int xMax = Math.Min(_width - 1, (int)Math.Ceiling(xGrid));
+        
+        int yMin = Math.Max(0, (int)Math.Floor(yGrid));
+        int yMax = Math.Min(_width - 1, (int)Math.Ceiling(yGrid));
+
+        float topLeft = grid.GetCell(xMin, yMin).H;
+        float topRight = grid.GetCell(xMax, yMin).H;
+        float bottomLeft = grid.GetCell(xMin, yMax).H;
+        float bottomRight = grid.GetCell(xMax, yMax).H;
+
+        bool topLeftWall = _heightGrid.GetCell(xMin, yMin).H > 0;
+        bool topRightWall = _heightGrid.GetCell(xMax, yMin).H > 0;
+        bool bottomLeftWall = _heightGrid.GetCell(xMin, yMax).H > 0;
+        bool bottomRightWall = _heightGrid.GetCell(xMax, yMax).H > 0;
+
+        float xW = xGrid - (float)Math.Truncate(xGrid);
+        float yW = yGrid - (float)Math.Truncate(yGrid);
+
+        float top = topLeftWall ? topRight 
+                    : topRightWall ? topLeft 
+                    : Lerp(topLeft, topRight, xW);
+        float bottom = bottomLeftWall ? bottomRight 
+                       : bottomRightWall ? bottomLeft
+                       : Lerp(bottomLeft, bottomRight, xW);
+
+        return topLeftWall && topRightWall ? bottom 
+                   : bottomLeftWall && bottomRightWall ? top 
+                   : Lerp(top, bottom, yW);
+    }
+
+    private static float Lerp(float a, float b, float w)
+    {
+        return a * (1 - w) + b * w;
+    }
+
+    private static float ShiftNearZeroHeight(float height)
+    {
+        return height < Math.Pow(10, -4) 
+                   ? -0.01f 
+                   : height;
+    }
+    
+    private static void LoadFrame(int index)
+    {
+        string fileName = _useSeparateFiles ? index.ToString() : "full";
+        var outputPath = $@"{_pathCopy}\output\{_simNameCopy}\{fileName}.txt";
 
         if (!File.Exists(outputPath))
-            return (null, null);
+            return;
         
-        var grid = new Grid(File.ReadAllText(outputPath));
+        Grid grid = _useSeparateFiles 
+                        ? new Grid(File.ReadAllText(outputPath)) 
+                        : new Grid(_inputGrids[index]);
         
-        var mesh = new Mesh { indexFormat = IndexFormat.UInt32 };
         var vertices = new Vector3[_triangles];
         var triangles = new int[_triangles];
 
@@ -207,116 +414,8 @@ public class GridManager : MonoBehaviour
             }
         }
 
-        mesh.vertices = vertices;
-        mesh.triangles = triangles;
-        mesh.RecalculateNormals();
-
-        return (grid, mesh);
-    }
-
-    private bool DrawGrid()
-    {
-        if (_frame < 0 || _frame >= _grids.Count)
-            return false;
-        
-        ClearChildren(true);
-        
-        if (_meshToggle.isOn)
-        {
-            Mesh mesh = _meshes[_frame];
-            
-            var surface = new GameObject("Surface", typeof(MeshFilter), typeof(MeshRenderer));
-            surface.transform.parent = transform;
-            surface.GetComponent<MeshFilter>().mesh = mesh;
-            surface.GetComponent<MeshRenderer>().material = waterMaterial;
-        }
-        else
-        {
-            Grid grid = _grids[_frame];
-            
-            for (var y = 0; y < grid.Height; y++)
-            {
-                for (var x = 0; x < grid.Width; x++)
-                {
-                    float height = grid.GetCell(x, y).H;
-                    if (_heightToggle.isOn ? height == 0 : height < 1 / Math.Pow(10, 4))
-                        continue;
-
-                    GameObject cell = Instantiate(waterCellPrefab, transform, true);
-                    cell.transform.position = GridToWorldCoors(x, y);
-                    cell.GetComponent<HeightCell>().Init(grid.GetCell(x, y), _cellText);
-                }
-            }
-        }
-
-        _frameText.text = $"Frame {_frame}";
-        
-        return true;
-    }
-
-    private Vector3 GridToWorldCoors(int x, int y)
-    {
-        return new Vector3(x - _width / 2f, 0, -(y - _height / 2f));
-    }
-
-    private int CoorsToVertexIndex(int x, int y, bool cellCenter)
-    {
-        return !cellCenter 
-                   ? y * (_width + 1) + x 
-                   : _cornerVertices + y * _width + x;
-    }
-
-    private int CoorsToTriangleIndex(int x, int y)
-    {
-        return 12 * (y * _width + x);
-    }
-
-    private float BiLerp(float x, float y, Grid grid)
-    {
-        // shift cell coors to grid center coors
-        float xGrid = x - 0.5f;
-        float yGrid = y - 0.5f;
-
-        int xMin = Math.Max(0, (int)Math.Floor(xGrid));
-        int xMax = Math.Min(_width - 1, (int)Math.Ceiling(xGrid));
-        
-        int yMin = Math.Max(0, (int)Math.Floor(yGrid));
-        int yMax = Math.Min(_width - 1, (int)Math.Ceiling(yGrid));
-
-        float topLeft = grid.GetCell(xMin, yMin).H;
-        float topRight = grid.GetCell(xMax, yMin).H;
-        float bottomLeft = grid.GetCell(xMin, yMax).H;
-        float bottomRight = grid.GetCell(xMax, yMax).H;
-
-        bool topLeftWall = _heightGrid.GetCell(xMin, yMin).H > 0;
-        bool topRightWall = _heightGrid.GetCell(xMax, yMin).H > 0;
-        bool bottomLeftWall = _heightGrid.GetCell(xMin, yMax).H > 0;
-        bool bottomRightWall = _heightGrid.GetCell(xMax, yMax).H > 0;
-
-        float xW = xGrid - (float)Math.Truncate(xGrid);
-        float yW = yGrid - (float)Math.Truncate(yGrid);
-
-        float top = topLeftWall ? topRight 
-                    : topRightWall ? topLeft 
-                    : Lerp(topLeft, topRight, xW);
-        float bottom = bottomLeftWall ? bottomRight 
-                       : bottomRightWall ? bottomLeft
-                       : Lerp(bottomLeft, bottomRight, xW);
-
-        return topLeftWall && topRightWall ? bottom 
-                   : bottomLeftWall && bottomRightWall ? top 
-                   : Lerp(top, bottom, yW);
-    }
-
-    private static float Lerp(float a, float b, float w)
-    {
-        return a * (1 - w) + b * w;
-    }
-
-    private static float ShiftNearZeroHeight(float height)
-    {
-        return height < Math.Pow(10, -4) 
-                   ? -0.01f 
-                   : height;
+        _grids[index] = grid;
+        _meshComponents[index].Item1 = vertices;
+        _meshComponents[index].Item2 = triangles;
     }
 }
