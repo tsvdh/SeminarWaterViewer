@@ -8,7 +8,6 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.UI;
 using Logger = TimeUtils.Logger;
-using Object = UnityEngine.Object;
 
 public class GridManager : MonoBehaviour
 {
@@ -38,6 +37,7 @@ public class GridManager : MonoBehaviour
     private TextMeshProUGUI _frameText;
     private Toggle _heightToggle;
     private Toggle _meshToggle;
+    private TextMeshProUGUI _loadingInfo;
 
     private int _frame;
     private int _simFPS;
@@ -74,6 +74,7 @@ public class GridManager : MonoBehaviour
         _frameText = GameObject.Find("Frame Info").GetComponent<TextMeshProUGUI>();
         _heightToggle = GameObject.Find("Height Toggle").GetComponent<Toggle>();
         _meshToggle = GameObject.Find("Mesh Toggle").GetComponent<Toggle>();
+        _loadingInfo = GameObject.Find("Loading Info").GetComponent<TextMeshProUGUI>();
         
         _heightToggle.onValueChanged.AddListener(_ => DrawGrid());
         _meshToggle.onValueChanged.AddListener(_ => DrawGrid());
@@ -209,8 +210,13 @@ public class GridManager : MonoBehaviour
                     framesLoaded++;
             }
 
+            _loadingInfo.text = $"Loading ({(float) framesLoaded / _numFrames:P})";
+
             if (framesLoaded == _numFrames)
+            {
                 Logger.EndEvent(LoadingEvent.GridProcessing, Format.Seconds);
+                _loadingInfo.text = "";
+            }
             else
                 return;
         }
