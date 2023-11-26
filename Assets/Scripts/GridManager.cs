@@ -51,7 +51,7 @@ public class GridManager : MonoBehaviour
     private static int _height;
     private static int _cornerVertices;
     private static int _centerVertices;
-    private static int _triangles;
+    private static int _triangleVertices;
 
     // Multithreading input variables
     private static string _pathCopy;
@@ -62,7 +62,7 @@ public class GridManager : MonoBehaviour
     // Multithreading output variables
     private static string[] _inputGrids;
     private static Grid[] _grids;
-    private static (Vector3[], int[])[] _meshComponents;
+    private static (Vector3[], int[], Vector3[])[] _meshComponents;
     private static Mesh[] _meshes;
     
     // Start is called before the first frame update
@@ -97,7 +97,7 @@ public class GridManager : MonoBehaviour
         
         _cornerVertices = (_width + 1) * (_height + 1);
         _centerVertices = _width * _height;
-        _triangles = 12 * _centerVertices;
+        _triangleVertices = 12 * _centerVertices;
 
         GameObject ground = Instantiate(groundCellPrefab, transform, true);
         Vector3 groundPos = ground.transform.position;
@@ -122,7 +122,7 @@ public class GridManager : MonoBehaviour
 
         _inputGrids = new string[_numFrames];
         _grids = new Grid[_numFrames];
-        _meshComponents = new (Vector3[], int[])[_numFrames];
+        _meshComponents = new (Vector3[], int[], Vector3[])[_numFrames];
         _meshes = new Mesh[_numFrames];
         
         Logger.StartEvent(LoadingEvent.All);
@@ -166,6 +166,9 @@ public class GridManager : MonoBehaviour
 
     private void UpdateLoadingProcess()
     {
+        if (Logger.IsEventDone(LoadingEvent.All))
+            return;
+        
         if (!_useSeparateFiles && !Logger.IsEventStarted(LoadingEvent.DiskReading))
         {
             Logger.StartEvent(LoadingEvent.DiskReading);
@@ -231,29 +234,12 @@ public class GridManager : MonoBehaviour
                 {
                     indexFormat = IndexFormat.UInt32,
                     vertices = _meshComponents[i].Item1,
-                    triangles = _meshComponents[i].Item2
+                    triangles = _meshComponents[i].Item2,
+                    normals = _meshComponents[i].Item3
                 };
             }
             
-            Task.Run(() => Parallel.For(0, _numFrames, 
-                                        new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount - 1 }, 
-                                        (i) => _meshes[i].RecalculateNormals()));
-            return;
-        }
-
-        if (Logger.IsEventRunning(LoadingEvent.MeshProcessing))
-        {
-            var meshesProcessed = 0;
-            for (var i = 0; i < _numFrames; i++)
-            {
-                if (!ReferenceEquals(_meshes[i], null))
-                    meshesProcessed++;
-            }
-
-            if (meshesProcessed == _numFrames)
-                Logger.EndEvent(LoadingEvent.MeshProcessing, Format.Seconds);
-            else
-                return;
+            Logger.EndEvent(LoadingEvent.MeshProcessing, Format.Milliseconds);
         }
 
         if (!Logger.IsEventDone(LoadingEvent.All))
@@ -390,8 +376,9 @@ public class GridManager : MonoBehaviour
                         ? new Grid(File.ReadLines(outputPath)) 
                         : new Grid(_inputGrids[index]);
         
-        var vertices = new Vector3[_triangles];
-        var triangles = new int[_triangles];
+        var vertices = new Vector3[_triangleVertices];
+        var triangles = new int[_triangleVertices];
+        var normals = new Vector3[_triangleVertices];
 
         var interpGrid = new Vector3[_cornerVertices];
 
@@ -431,11 +418,24 @@ public class GridManager : MonoBehaviour
                     centerPos, bottomRightPos, bottomLeftPos, // bottom
                     centerPos, topRightPos, bottomRightPos // right
                 };
-                
+
                 for (var i = 0; i < 12; i++)
                 {
                     vertices[startIndex + i] = posArray[i];
                     triangles[startIndex + i] = startIndex + i;
+                }
+                
+                var cellNormals = new Vector3[4];
+                for (var i = 0; i < 4; i++)
+                {
+                    int triangleStart = startIndex + 3 * i;
+                    cellNormals[i] = Vector3.Cross(vertices[triangleStart + 1] - vertices[triangleStart], 
+                                                   vertices[triangleStart + 2] - vertices[triangleStart])
+                                            .normalized;
+                }
+                for (var i = 0; i < 12; i++)
+                {
+                    normals[startIndex + i] = cellNormals[i / 3];
                 }
             }
         }
@@ -443,5 +443,6 @@ public class GridManager : MonoBehaviour
         _grids[index] = grid;
         _meshComponents[index].Item1 = vertices;
         _meshComponents[index].Item2 = triangles;
+        _meshComponents[index].Item3 = normals;
     }
 }

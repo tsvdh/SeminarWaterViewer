@@ -63,7 +63,13 @@ namespace TimeUtils
                 Format.Seconds => 1000,
                 _ => throw new SystemException()
             };
-            Debug.Log($"{eventType.ToString()} took: {span.GetDuration() / divider}");
+            string unit = format switch
+            {
+                Format.Milliseconds => "ms",
+                Format.Seconds => "s",
+                _ => throw new SystemException()
+            };
+            Debug.Log($"{eventType.ToString()} took: {span.GetDuration() / divider}{unit}");
         }
 
         public static bool IsEventStarted(Enum eventType)
