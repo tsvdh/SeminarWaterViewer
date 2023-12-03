@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,11 +12,18 @@ using Logger = TimeUtils.Logger;
 
 public class GridManager : MonoBehaviour
 {
-    private struct ConfigFile
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
+    private struct SimConfig
     {
         public int fps;
         public int seconds;
         public bool separateFiles;
+    }
+
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
+    private struct GlobalConfig
+    {
+        public string name;
     }
     
     private enum LoadingEvent 
@@ -68,6 +76,12 @@ public class GridManager : MonoBehaviour
     // Start is called before the first frame update
     private void Start()
     {
+        var globalConfigPath = $@"{path}\input\config.json";
+        var globalConfig = JsonUtility.FromJson<GlobalConfig>(File.ReadAllText(globalConfigPath));
+
+        if (simName.Equals("use_global"))
+            simName = globalConfig.name;
+        
         _pathCopy = path;
         _simNameCopy = simName;
         _cellText = GameObject.Find("Cell Info").GetComponent<TextMeshProUGUI>();
@@ -81,14 +95,13 @@ public class GridManager : MonoBehaviour
 
         ClearChildren(false);
 
-        var configPath = $@"{path}\input\{simName}\config.json";
+        var simConfigPath = $@"{path}\input\{simName}\config.json";
         var inputPath = $@"{path}\input\{simName}\data.txt";
 
-        var config = JsonUtility.FromJson<ConfigFile>(File.ReadAllText(configPath));
-
-        _simFPS = config.fps;
-        _numFrames = config.seconds * _simFPS + 1;
-        _useSeparateFiles = config.separateFiles;
+        var simConfig = JsonUtility.FromJson<SimConfig>(File.ReadAllText(simConfigPath));
+        _simFPS = simConfig.fps;
+        _numFrames = simConfig.seconds * _simFPS + 1;
+        _useSeparateFiles = simConfig.separateFiles;
         
         string data = File.ReadAllText(inputPath).Split("-")[1];
         _heightGrid = new Grid(data);
@@ -194,8 +207,12 @@ public class GridManager : MonoBehaviour
             });
             return;
         }
-        
-        if (!Logger.IsEventRunning(LoadingEvent.DiskReading) && !Logger.IsEventStarted(LoadingEvent.GridProcessing))
+
+        if (Logger.IsEventRunning(LoadingEvent.DiskReading))
+        {
+            return;
+        }
+        if (!Logger.IsEventStarted(LoadingEvent.GridProcessing))
         {
             Logger.StartEvent(LoadingEvent.GridProcessing);
             Task.Run(() => Parallel.For(0, _numFrames, 
