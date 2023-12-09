@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 public class Grid
@@ -79,5 +80,16 @@ public class Grid
     public Cell GetCell(int x, int y)
     {
         return _cells[y, x];
+    }
+
+    public float GetMaxHeight()
+    {
+        float maxHeight = 0;
+        
+        for (var y = 0; y < Height; y++)
+            for (var x = 0; x < Width; x++)
+                maxHeight = Math.Max(maxHeight, GetCell(x, y).H);
+        
+        return maxHeight;
     }
 }

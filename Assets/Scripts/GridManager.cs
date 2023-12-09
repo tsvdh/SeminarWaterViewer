@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,7 +11,7 @@ using Logger = TimeUtils.Logger;
 
 public class GridManager : MonoBehaviour
 {
-    [SuppressMessage("ReSharper", "InconsistentNaming")]
+    [Serializable]
     private struct SimConfig
     {
         public int fps;
@@ -20,10 +19,24 @@ public class GridManager : MonoBehaviour
         public bool separateFiles;
     }
 
-    [SuppressMessage("ReSharper", "InconsistentNaming")]
+    [Serializable]
     private struct GlobalConfig
     {
         public string name;
+    }
+    
+    [Serializable]
+    private struct BuilderConfig
+    {
+        public BuilderUnit[] wall;
+    }
+    
+    [Serializable]
+    private struct BuilderUnit
+    {
+        public int[] topLeft;
+        public int[] bottomRight;
+        public int height;
     }
     
     private enum LoadingEvent 
@@ -50,9 +63,11 @@ public class GridManager : MonoBehaviour
     private int _frame;
     private int _simFPS;
     private int _numFrames;
-    private float _timeSinceLastFrame;
     private bool _forwardCache;
     private bool _backwardsCache;
+    private MeshFilter _surfaceMesh;
+    private HeightCell[,] _waterCells;
+    private GameObject _waterCellHolder;
     
     // Grid method variables
     private static int _width;
@@ -93,13 +108,13 @@ public class GridManager : MonoBehaviour
         _heightToggle.onValueChanged.AddListener(_ => DrawGrid());
         _meshToggle.onValueChanged.AddListener(_ => DrawGrid());
 
-        ClearChildren(false);
-
         var simConfigPath = $@"{path}\input\{simName}\config.json";
         var inputPath = $@"{path}\input\{simName}\data.txt";
+        var builderPath = $@"{path}\input\{simName}\builder.json";
 
         var simConfig = JsonUtility.FromJson<SimConfig>(File.ReadAllText(simConfigPath));
         _simFPS = simConfig.fps;
+        Time.fixedDeltaTime = 1f / _simFPS;
         _numFrames = simConfig.seconds * _simFPS + 1;
         _useSeparateFiles = simConfig.separateFiles;
         
@@ -111,26 +126,48 @@ public class GridManager : MonoBehaviour
         _cornerVertices = (_width + 1) * (_height + 1);
         _centerVertices = _width * _height;
         _triangleVertices = 12 * _centerVertices;
+        
+        ClearChildren(false);
 
-        GameObject ground = Instantiate(groundCellPrefab, transform, true);
+        GameObject ground = Instantiate(groundCellPrefab, transform);
+        ground.GetComponent<StaticBoxCell>().Init(_width, _height, 1, Vector3.zero);
         Vector3 groundPos = ground.transform.position;
         groundPos.y = -0.5f;
         groundPos.x -= 0.5f;
         groundPos.z += 0.5f;
         ground.transform.position = groundPos;
-        ground.GetComponent<GroundCell>().Init(_width, _height);
         
+        var surfaceObject = new GameObject("Surface", typeof(MeshFilter), typeof(MeshRenderer));
+        surfaceObject.transform.parent = transform;
+        surfaceObject.GetComponent<MeshRenderer>().material = waterMaterial;
+        surfaceObject.SetActive(_meshToggle.isOn);
+        _surfaceMesh = surfaceObject.GetComponent<MeshFilter>();
+
+        _waterCellHolder = new GameObject("WaterHolder");
+        _waterCellHolder.transform.parent = transform;
+
+        _waterCells = new HeightCell[_height, _width];
         for (var y = 0; y < _height; y++)
         {
             for (var x = 0; x < _width; x++)
             {
-                if (_heightGrid.GetCell(x, y).H > 0)
-                {
-                    GameObject wall = Instantiate(wallCellPrefab, transform, true);
-                    wall.transform.position = GridToWorldCoors(x, y);
-                    wall.GetComponent<HeightCell>().Init(_heightGrid.GetCell(x, y), _cellText);
-                }
+                GameObject waterCellObject = Instantiate(waterCellPrefab, _waterCellHolder.transform);
+                waterCellObject.transform.position = GridToWorldCoors(x, y);
+                waterCellObject.GetComponent<HeightCell>().Init(_cellText);
+                _waterCells[y, x] = waterCellObject.GetComponent<HeightCell>();
             }
+        }
+        
+        var builderConfig = JsonUtility.FromJson<BuilderConfig>(File.ReadAllText(builderPath));
+        foreach (BuilderUnit unit in builderConfig.wall)
+        {
+            float unitWidth = unit.bottomRight[0] - unit.topLeft[0] + 1;
+            float unitDepth = unit.bottomRight[1] - unit.topLeft[0] + 1;
+            Vector3 worldCoors = GridToWorldCoors(unit.topLeft[0] - 1 + unitWidth / 2 - 0.5f,
+                                                  unit.topLeft[1] - 1 + unitDepth / 2 - 0.5f);
+            
+            GameObject wallObject = Instantiate(wallCellPrefab, transform);
+            wallObject.GetComponent<StaticBoxCell>().Init(unitWidth, unitDepth, unit.height, worldCoors);
         }
 
         _inputGrids = new string[_numFrames];
@@ -144,8 +181,6 @@ public class GridManager : MonoBehaviour
     // Update is called once per frame
     private void Update()
     {
-        _timeSinceLastFrame += Time.deltaTime;
-        
         if (Input.GetKeyDown(KeyCode.RightArrow)
             || (Input.GetKey(KeyCode.RightArrow) && Input.GetKey(KeyCode.RightShift)))
             _forwardCache = true;
@@ -153,10 +188,10 @@ public class GridManager : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.LeftArrow)
             || (Input.GetKey(KeyCode.LeftArrow) && Input.GetKey(KeyCode.RightShift)))
             _backwardsCache = true;
-        
-        if (_timeSinceLastFrame < 1f / _simFPS)
-            return;
+    }
 
+    private void FixedUpdate()
+    {
         UpdateLoadingProcess();
         
         if (_forwardCache)
@@ -172,7 +207,6 @@ public class GridManager : MonoBehaviour
                 _frame++;
         }
         
-        _timeSinceLastFrame = 0;
         _forwardCache = false;
         _backwardsCache = false;
     }
@@ -280,32 +314,21 @@ public class GridManager : MonoBehaviour
         if (_frame < 0 || _frame >= _grids.Length)
             return false;
         
-        ClearChildren(true);
+        _surfaceMesh.gameObject.SetActive(_meshToggle.isOn);
+        _waterCellHolder.SetActive(!_meshToggle.isOn);
         
         if (_meshToggle.isOn)
         {
-            Mesh mesh = _meshes[_frame];
-            
-            var surface = new GameObject("Surface", typeof(MeshFilter), typeof(MeshRenderer));
-            surface.transform.parent = transform;
-            surface.GetComponent<MeshFilter>().mesh = mesh;
-            surface.GetComponent<MeshRenderer>().material = waterMaterial;
+            _surfaceMesh.mesh = _meshes[_frame];
         }
         else
         {
             Grid grid = _grids[_frame];
-            
-            for (var y = 0; y < grid.Height; y++)
+            for (var y = 0; y < _height; y++)
             {
-                for (var x = 0; x < grid.Width; x++)
+                for (var x = 0; x < _width; x++)
                 {
-                    float height = grid.GetCell(x, y).H;
-                    if (_heightToggle.isOn ? height == 0 : height < 1 / Math.Pow(10, 4))
-                        continue;
-
-                    GameObject cell = Instantiate(waterCellPrefab, transform, true);
-                    cell.transform.position = GridToWorldCoors(x, y);
-                    cell.GetComponent<HeightCell>().Init(grid.GetCell(x, y), _cellText);
+                    _waterCells[y, x].SetCell(grid.GetCell(x, y));
                 }
             }
         }
@@ -315,7 +338,7 @@ public class GridManager : MonoBehaviour
         return true;
     }
 
-    private static Vector3 GridToWorldCoors(int x, int y)
+    private static Vector3 GridToWorldCoors(float x, float y)
     {
         return new Vector3(x - _width / 2f, 0, -(y - _height / 2f));
     }

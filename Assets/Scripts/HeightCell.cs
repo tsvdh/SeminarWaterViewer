@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using UnityEngine;
 
@@ -5,12 +6,26 @@ public class HeightCell : MonoBehaviour
 {
     private Cell _cell;
     private TextMeshProUGUI _text;
+
+    public void Init(TextMeshProUGUI text)
+    {
+        _text = text;
+    }
     
     public void Init(Cell cell, TextMeshProUGUI text)
     {
         _cell = cell;
         _text = text;
         
+        SetCell(cell);
+    }
+
+    public void SetCell(Cell cell)
+    {
+        _cell = cell;
+
+        gameObject.SetActive(!(cell.H < Math.Pow(10, -4)));
+
         Transform cellTransform = transform;
         
         Vector3 scale = cellTransform.localScale;
