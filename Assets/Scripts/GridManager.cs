@@ -145,6 +145,7 @@ public class GridManager : MonoBehaviour
 
         _waterCellHolder = new GameObject("WaterHolder");
         _waterCellHolder.transform.parent = transform;
+        _waterCellHolder.SetActive(false);
 
         _waterCells = new HeightCell[_height, _width];
         for (var y = 0; y < _height; y++)
@@ -162,7 +163,7 @@ public class GridManager : MonoBehaviour
         foreach (BuilderUnit unit in builderConfig.wall)
         {
             float unitWidth = unit.bottomRight[0] - unit.topLeft[0] + 1;
-            float unitDepth = unit.bottomRight[1] - unit.topLeft[0] + 1;
+            float unitDepth = unit.bottomRight[1] - unit.topLeft[1] + 1;
             Vector3 worldCoors = GridToWorldCoors(unit.topLeft[0] - 1 + unitWidth / 2 - 0.5f,
                                                   unit.topLeft[1] - 1 + unitDepth / 2 - 0.5f);
             
