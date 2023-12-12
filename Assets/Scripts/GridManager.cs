@@ -1,7 +1,9 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
+using Configs;
 using TimeUtils;
 using TMPro;
 using UnityEngine;
@@ -11,34 +13,6 @@ using Logger = TimeUtils.Logger;
 
 public class GridManager : MonoBehaviour
 {
-    [Serializable]
-    private struct SimConfig
-    {
-        public int fps;
-        public int seconds;
-        public bool separateFiles;
-    }
-
-    [Serializable]
-    private struct GlobalConfig
-    {
-        public string name;
-    }
-    
-    [Serializable]
-    private struct BuilderConfig
-    {
-        public BuilderUnit[] wall;
-    }
-    
-    [Serializable]
-    private struct BuilderUnit
-    {
-        public int[] topLeft;
-        public int[] bottomRight;
-        public int height;
-    }
-    
     private enum LoadingEvent 
     {
         All,
@@ -265,23 +239,29 @@ public class GridManager : MonoBehaviour
                     framesLoaded++;
             }
 
-            _loadingInfo.text = $"Loading ({(float) framesLoaded / _numFrames:P})";
+            _loadingInfo.text = $"Processing grids ({(float) framesLoaded / _numFrames:P})";
 
             if (framesLoaded == _numFrames)
             {
-                Logger.EndEvent(LoadingEvent.GridProcessing, Format.Seconds);
                 _loadingInfo.text = "";
+                Logger.EndEvent(LoadingEvent.GridProcessing, Format.Seconds);
+                Logger.StartEvent(LoadingEvent.MeshProcessing);
             }
             else
                 return;
         }
 
-        if (!Logger.IsEventStarted(LoadingEvent.MeshProcessing))
+        if (Logger.IsEventRunning(LoadingEvent.MeshProcessing))
         {
-            Logger.StartEvent(LoadingEvent.MeshProcessing);
-
+            var allDone = true;
+            var stopWatch = new Stopwatch();
+            stopWatch.Start();
+            
             for (var i = 0; i < _numFrames; i++)
             {
+                if (_meshes[i]) 
+                    continue;
+                
                 _meshes[i] = new Mesh
                 {
                     indexFormat = IndexFormat.UInt32,
@@ -289,9 +269,23 @@ public class GridManager : MonoBehaviour
                     triangles = _meshComponents[i].Item2,
                     normals = _meshComponents[i].Item3
                 };
+
+                if (stopWatch.ElapsedMilliseconds > 50)
+                {
+                    stopWatch.Stop();
+                    _loadingInfo.text = $"Building meshes ({(float)i / _numFrames:P})";
+                    allDone = false;
+                    break;
+                }
             }
             
-            Logger.EndEvent(LoadingEvent.MeshProcessing, Format.Milliseconds);
+            if (allDone)
+            {
+                _loadingInfo.text = "";
+                Logger.EndEvent(LoadingEvent.MeshProcessing, Format.Seconds);
+            }
+            else
+                return;
         }
 
         if (!Logger.IsEventDone(LoadingEvent.All))
@@ -329,7 +323,7 @@ public class GridManager : MonoBehaviour
             {
                 for (var x = 0; x < _width; x++)
                 {
-                    _waterCells[y, x].SetCell(grid.GetCell(x, y));
+                    _waterCells[y, x].SetCell(grid.GetCell(x, y), _heightToggle.isOn);
                 }
             }
         }
@@ -400,7 +394,7 @@ public class GridManager : MonoBehaviour
 
     private static float ShiftNearZeroHeight(float height)
     {
-        return height < Math.Pow(10, -4) 
+        return height < Math.Pow(10, -2) 
                    ? -0.01f 
                    : height;
     }

@@ -1,17 +1,28 @@
+using System;
+using System.IO;
+using Configs;
 using UnityEngine;
 
 public class CameraScript : MonoBehaviour
 {
     private Vector3 _prevMousePos;
+
+    private int _width;
     
     // Start is called before the first frame update
     private void Start()
     {
+        var gridManager = GameObject.Find("Grid").GetComponent<GridManager>();
+        var simConfigPath = $@"{gridManager.path}\input\{gridManager.simName}\config.json";
+        var simConfig = JsonUtility.FromJson<SimConfig>(File.ReadAllText(simConfigPath));
+
+        _width = simConfig.width;
+        
         _prevMousePos = Input.mousePosition;
     }
 
-    // Update is called once per fixed frame
-    private void FixedUpdate()
+    // Update is called once per frame
+    private void Update()
     {
         Transform curTransform = transform;
 
@@ -19,30 +30,36 @@ public class CameraScript : MonoBehaviour
         forward.y = 0;
         forward.Normalize();
         
+        // full grid in 2 seconds
+        float speedMultiplier = Time.deltaTime * _width / 2;
+        
         if (Input.GetKey(KeyCode.W))
         {
-            curTransform.position += forward * 0.2f;
+            curTransform.position += forward * speedMultiplier;
         }
         if (Input.GetKey(KeyCode.S))
         {
-            curTransform.position += forward * -0.2f;
+            curTransform.position += forward * -speedMultiplier;
         }
         if (Input.GetKey(KeyCode.A))
         {
-            curTransform.position += curTransform.right * -0.2f;
+            curTransform.position += curTransform.right * -speedMultiplier;
         }
         if (Input.GetKey(KeyCode.D))
         {
-            curTransform.position += curTransform.right * 0.2f;
+            curTransform.position += curTransform.right * speedMultiplier;
         }
 
         float scroll = Input.mouseScrollDelta.y;
         if (scroll != 0)
         {
+            // 1 second of scrolling for full range
+            float scrollMultiplier = Time.deltaTime * _width / 1;
+
             if (scroll > 0)
-                curTransform.position += Vector3.down;
+                curTransform.position += Vector3.down * scrollMultiplier;
             else
-                curTransform.position += Vector3.up;
+                curTransform.position += Vector3.up * scrollMultiplier;
         }
 
         Vector3 newMousePos = Input.mousePosition;

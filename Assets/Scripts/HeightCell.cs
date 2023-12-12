@@ -11,20 +11,18 @@ public class HeightCell : MonoBehaviour
     {
         _text = text;
     }
-    
-    public void Init(Cell cell, TextMeshProUGUI text)
-    {
-        _cell = cell;
-        _text = text;
-        
-        SetCell(cell);
-    }
 
-    public void SetCell(Cell cell)
+    public void SetCell(Cell cell, bool showLow)
     {
         _cell = cell;
 
-        gameObject.SetActive(!(cell.H < Math.Pow(10, -4)));
+        bool belowLowThreshold = cell.H < Math.Pow(10, -2);
+        bool belowMinThreshold = cell.H < Math.Pow(10, -6);
+        bool shouldShow = !belowLowThreshold || (showLow && !belowMinThreshold);
+        gameObject.SetActive(shouldShow);
+
+        if (!shouldShow)
+            return;
 
         Transform cellTransform = transform;
         
@@ -37,7 +35,7 @@ public class HeightCell : MonoBehaviour
         cellTransform.position = pos;
     }
 
-    private void OnMouseEnter()
+    private void OnMouseOver()
     {
         _text.text = $"({_cell.X + 1}, {_cell.Y + 1}): h: {_cell.H}, qx: {_cell.Qx}, qy: {_cell.Qy}";
     }
