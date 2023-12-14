@@ -73,5 +73,11 @@ public class CameraScript : MonoBehaviour
             eulerAngles.y += mousePosDelta.x / 2;
             curTransform.eulerAngles = eulerAngles;
         }
+        
+        if (Input.GetKey(KeyCode.R))
+        {
+            curTransform.forward = Vector3.forward;
+            curTransform.up = Vector3.up;
+        }
     }
 }
